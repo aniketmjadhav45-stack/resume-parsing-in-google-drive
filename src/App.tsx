@@ -18,8 +18,11 @@ import {
   handleFirestoreError,
   OperationType,
   User,
-  serverTimestamp,
-  GoogleAuthProvider
+  signInWithEmailAndPassword,
+  createUserWithEmailAndPassword,
+  updateProfile,
+  GoogleAuthProvider,
+  serverTimestamp
 } from './firebase';
 import { Resume, Folder } from './types';
 import { extractResumeData } from './services/gemini';
@@ -73,6 +76,12 @@ import { cn } from './lib/utils';
 export default function App() {
   const [user, setUser] = useState<User | null>(null);
   const [googleAccessToken, setGoogleAccessToken] = useState<string | null>(localStorage.getItem('google_access_token'));
+  const [authEmail, setAuthEmail] = useState('');
+  const [authPassword, setAuthPassword] = useState('');
+  const [authDisplay, setAuthDisplay] = useState('');
+  const [isSignup, setIsSignup] = useState(false);
+  const [authError, setAuthError] = useState<string | null>(null);
+  const [isResending, setIsResending] = useState(false);
   const [resumes, setResumes] = useState<Resume[]>([]);
   const [folders, setFolders] = useState<Folder[]>([]);
   const [selectedResume, setSelectedResume] = useState<Resume | null>(null);
@@ -186,7 +195,7 @@ export default function App() {
     });
   }, [resumes, searchQuery, selectedFolder]);
 
-  const handleLogin = async () => {
+  const handleGoogleDriveSync = async () => {
     try {
       const result = await signInWithPopup(auth, googleProvider);
       const credential = GoogleAuthProvider.credentialFromResult(result);
@@ -195,7 +204,30 @@ export default function App() {
         localStorage.setItem('google_access_token', credential.accessToken);
       }
     } catch (error) {
-      console.error('Login failed:', error);
+      console.error('Google Drive connection failed:', error);
+      alert('Failed to connect to Google Drive. Please try again.');
+    }
+  };
+
+  const handleEmailPasswordAuth = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setAuthError(null);
+    setIsResending(true);
+    
+    try {
+      if (isSignup) {
+        const result = await createUserWithEmailAndPassword(auth, authEmail, authPassword);
+        if (authDisplay) {
+          await updateProfile(result.user, { displayName: authDisplay });
+        }
+      } else {
+        await signInWithEmailAndPassword(auth, authEmail, authPassword);
+      }
+    } catch (error: any) {
+      console.error('Auth failed:', error);
+      setAuthError(error.message || 'Authentication failed. Please check your credentials.');
+    } finally {
+      setIsResending(false);
     }
   };
 
@@ -432,20 +464,101 @@ export default function App() {
         <motion.div 
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          className="max-w-md w-full bg-white rounded-2xl shadow-xl p-8 text-center"
+          className="max-w-md w-full bg-white rounded-2xl shadow-xl p-8 overflow-hidden relative"
         >
           <div className="w-16 h-16 bg-blue-600 rounded-2xl flex items-center justify-center mx-auto mb-6 shadow-lg shadow-blue-200">
             <FileText className="text-white w-8 h-8" />
           </div>
-          <h1 className="text-3xl font-bold text-slate-900 mb-2">ResumeAI</h1>
-          <p className="text-slate-600 mb-8">Smart Resume Management powered by AI. Extract data, categorize talent, and find the perfect candidate instantly.</p>
-          <button 
-            onClick={handleLogin}
-            className="w-full py-3 px-4 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-xl transition-all flex items-center justify-center gap-3 shadow-lg shadow-blue-100"
-          >
-            <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" className="w-5 h-5 bg-white rounded-full p-0.5" alt="Google" />
-            Sign in with Google
-          </button>
+          <h1 className="text-2xl font-bold text-slate-900 mb-1 text-center">ResumeAI</h1>
+          <p className="text-slate-500 mb-8 text-center text-sm">
+            {isSignup ? 'Create an account to start managing resumes.' : 'Sign in to access your resume vault.'}
+          </p>
+
+          <form onSubmit={handleEmailPasswordAuth} className="space-y-4">
+            {isSignup && (
+              <div>
+                <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-1.5 ml-1">Full Name</label>
+                <div className="relative">
+                  <span className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400">
+                    <FileText className="w-4 h-4" />
+                  </span>
+                  <input 
+                    type="text"
+                    required
+                    placeholder="John Doe"
+                    value={authDisplay}
+                    onChange={(e) => setAuthDisplay(e.target.value)}
+                    className="w-full pl-11 pr-4 py-3 bg-slate-50 border border-slate-100 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all text-sm"
+                  />
+                </div>
+              </div>
+            )}
+            <div>
+              <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-1.5 ml-1">Email Address</label>
+              <div className="relative">
+                <span className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400">
+                  <Mail className="w-4 h-4" />
+                </span>
+                <input 
+                  type="email"
+                  required
+                  placeholder="name@company.com"
+                  value={authEmail}
+                  onChange={(e) => setAuthEmail(e.target.value)}
+                  className="w-full pl-11 pr-4 py-3 bg-slate-50 border border-slate-100 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all text-sm"
+                />
+              </div>
+            </div>
+            <div>
+              <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-1.5 ml-1">Password</label>
+              <div className="relative">
+                <span className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400">
+                  <FileText className="w-4 h-4" />
+                </span>
+                <input 
+                  type="password"
+                  required
+                  placeholder="••••••••"
+                  value={authPassword}
+                  onChange={(e) => setAuthPassword(e.target.value)}
+                  className="w-full pl-11 pr-4 py-3 bg-slate-50 border border-slate-100 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all text-sm"
+                />
+              </div>
+            </div>
+
+            {authError && (
+              <p className="text-xs text-red-500 mt-2 text-center bg-red-50 p-2 rounded-lg border border-red-100">
+                {authError}
+              </p>
+            )}
+
+            <button 
+              type="submit"
+              disabled={isResending}
+              className="w-full py-3.5 px-4 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl transition-all flex items-center justify-center gap-2 shadow-lg shadow-blue-100 disabled:opacity-50 mt-4"
+            >
+              {isResending ? (
+                <Loader2 className="w-5 h-5 animate-spin" />
+              ) : (
+                isSignup ? 'Create Account' : 'Sign In'
+              )}
+            </button>
+          </form>
+
+          <div className="mt-8 pt-6 border-t border-slate-100 text-center">
+            <p className="text-sm text-slate-500">
+              {isSignup ? 'Already have an account?' : "Don't have an account?"}
+              <button 
+                onClick={() => {
+                  setIsSignup(!isSignup);
+                  setAuthError(null);
+                }}
+                className="ml-2 text-blue-600 font-bold hover:underline"
+              >
+                {isSignup ? 'Sign In' : 'Sign Up'}
+              </button>
+            </p>
+          </div>
         </motion.div>
       </div>
     );
@@ -533,22 +646,32 @@ export default function App() {
 
         <div className="p-4 border-t border-slate-100">
           <div className="flex items-center gap-3 p-3 rounded-xl bg-slate-50 mb-3">
-            <img src={user.photoURL || ''} className="w-10 h-10 rounded-full border-2 border-white shadow-sm" alt={user.displayName || ''} />
-            <div className="flex-1 min-w-0">
-              <p className="text-sm font-semibold text-slate-900 truncate">{user.displayName}</p>
-              <div className="text-[10px] text-emerald-600 font-bold flex items-center gap-1">
-                <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                Google Drive Sync Active
+            {user.photoURL ? (
+              <img src={user.photoURL} className="w-10 h-10 rounded-full border-2 border-white shadow-sm" alt={user.displayName || ''} />
+            ) : (
+              <div className="w-10 h-10 rounded-full border-2 border-white shadow-sm bg-blue-600 flex items-center justify-center text-white font-bold text-xs">
+                {user.displayName?.charAt(0) || user.email?.charAt(0).toUpperCase()}
               </div>
+            )}
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-semibold text-slate-900 truncate">{user.displayName || user.email?.split('@')[0]}</p>
+              {googleAccessToken ? (
+                <div className="text-[10px] text-emerald-600 font-bold flex items-center gap-1">
+                  <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                  Drive Sync Active
+                </div>
+              ) : (
+                <p className="text-[10px] text-slate-400 font-medium">Drive Sync Offline</p>
+              )}
             </div>
           </div>
-          {googleAccessToken ? null : (
+          {!googleAccessToken && (
             <button 
-              onClick={handleLogin}
+              onClick={handleGoogleDriveSync}
               className="w-full mb-3 py-2 px-3 bg-blue-50 text-blue-600 text-xs font-bold rounded-xl hover:bg-blue-100 transition-all flex items-center justify-center gap-2"
             >
               <Upload className="w-3.5 h-3.5" />
-              Reconnect Drive
+              Connect Google Drive
             </button>
           )}
           <button 
