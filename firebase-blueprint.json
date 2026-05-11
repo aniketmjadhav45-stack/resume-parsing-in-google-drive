@@ -1,0 +1,47 @@
+{
+  "entities": {
+    "Resume": {
+      "title": "Resume",
+      "description": "A document containing a candidate's professional background and skills.",
+      "type": "object",
+      "properties": {
+        "fullName": { "type": "string", "description": "Candidate's full name" },
+        "email": { "type": "string", "format": "email", "description": "Candidate's email address" },
+        "phone": { "type": "string", "description": "Candidate's phone number" },
+        "primaryRole": { "type": "string", "description": "Primary job role or title" },
+        "skills": { "type": "array", "items": { "type": "string" }, "description": "List of extracted skills" },
+        "workExperience": { "type": "string", "description": "Extracted work history" },
+        "education": { "type": "string", "description": "Extracted education details" },
+        "projects": { "type": "string", "description": "Extracted project details" },
+        "location": { "type": "string", "description": "Candidate's location" },
+        "fileUrl": { "type": "string", "format": "uri", "description": "URL to the original resume file" },
+        "fileName": { "type": "string", "description": "Original file name" },
+        "fileType": { "type": "string", "description": "MIME type of the file" },
+        "createdAt": { "type": "string", "format": "date-time", "description": "When the resume was uploaded" },
+        "ownerId": { "type": "string", "description": "UID of the user who uploaded the resume" }
+      },
+      "required": ["fullName", "email", "primaryRole", "skills", "ownerId"]
+    },
+    "Folder": {
+      "title": "Folder",
+      "description": "A dynamic category based on a specific job role.",
+      "type": "object",
+      "properties": {
+        "roleName": { "type": "string", "description": "The job role this folder represents" },
+        "resumeCount": { "type": "integer", "description": "Number of resumes in this folder" },
+        "ownerId": { "type": "string", "description": "UID of the user who owns this folder" }
+      },
+      "required": ["roleName", "ownerId"]
+    }
+  },
+  "firestore": {
+    "/resumes/{resumeId}": {
+      "schema": "Resume",
+      "description": "Collection of all uploaded resumes and their extracted data."
+    },
+    "/folders/{folderId}": {
+      "schema": "Folder",
+      "description": "Collection of dynamic skill-based folders."
+    }
+  }
+}

@@ -1,0 +1,5 @@
+{
+  "name": "ResumeAI - Smart Resume Manager",
+  "description": "An AI-powered resume management system that automatically extracts data, categorizes candidates into smart folders, and provides a searchable database of talent.",
+  "requestFramePermissions": []
+}
